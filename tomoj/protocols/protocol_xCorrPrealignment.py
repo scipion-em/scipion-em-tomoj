@@ -1,8 +1,10 @@
 # **************************************************************************
 # *
 # * Authors:     Federico P. de Isidro Gomez (fp.deisidro@cnb.csi.es) [1]
+# *              Antoine Cossa (antoine.cossa@universite-paris-saclay.fr) [2]
 # *
 # * [1] Centro Nacional de Biotecnologia, CSIC, Spain
+# * [2] Universite Paris-Saclay, Orsay, France
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -60,7 +62,6 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       default=False,
                       label='Compute integer translation',
                       important=True,
-                      display=params.EnumParam.DISPLAY_HLIST,
                       help='Compute integer translation via cross correlation '
                            'for the tilt-series.')
 
@@ -71,24 +72,26 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                            'value (integer) corresponds to the factor of '
                            'reduction, usually 2,4,8...')
 
-        form.addParam('roi', params.BooleanParam,
-                      default=False,
-                      label='ROI centered cross-correlation',
-                      important=True,
-                      help='Take the central part of images of size rwidth '
-                           'rheight (integers) to compute cross-correlation.')
+        roi = form.addLine('ROI centered cross-correlation',
+                           help='Take the central part of images of size Width'
+                                ' Height (integers) to compute cross-'
+                                'correlation.')
 
-        roi = form.addLine('', condition='roi',
-                           help='Width and height of the centered ROI.')
+        roi.addParam('roi', params.BooleanParam,
+                     default=False,
+                     label='',
+                     important=True)
 
         roi.addParam('rwidth', params.IntParam,
                      label='Width',
                      important=True,
+                     condition='roi',
                      help='Width of the centered ROI.')
 
         roi.addParam('rheight', params.IntParam,
                      label='Height',
                      important=True,
+                     condition='roi',
                      help='Height of the centered ROI.')
 
         bandpass = form.addLine('Bandpass filter',
@@ -100,16 +103,24 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                                      '(double) to the sinusoidal decrease '
                                      'radius (in pixels) to prevent artifacts.')
 
-        bandpass.addParam('bandpassmin', params.FloatParam,
-                          label='Min',
+        bandpass.addParam('bandpass', params.BooleanParam,
+                          default=False,
                           important=True)
 
+        bandpass.addParam('bandpassmin', params.FloatParam,
+                          label='Min',
+                          important=True,
+                          condition='bandpass')
+        
         bandpass.addParam('bandpassmax', params.FloatParam,
                           label='Max',
-                          important=True)
+                          important=True,
+                          condition='bandpass')
+
         bandpass.addParam('bandpassdecrease', params.IntParam,
                           label='Decrease',
-                          important=True)
+                          important=True,
+                          condition='bandpass')
 
         form.addParam('variancefilter', params.IntParam,
                       default=1,
@@ -117,26 +128,33 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       important=True,
                       help='Apply a variance filter on images with the given '
                            'radius (integer). It results in contours images.')
-        form.addParam('expandimage', params.FloatParam,
-                      default=0.0,
-                      label='Expand images',
-                      important=True,
-                      help='Expands the image to correct the stretching due to'
-                           ' tilt. To do this correctly the tilt axis needs to'
-                           ' be given as angle (double) from vertical axis.')
+
+        expand = form.addLine('Expand images',
+                              help='Expands the image to correct the '
+                                   'stretching due to tilt. To do this '
+                                   'correctly the tilt axis needs to be given '
+                                   'as angle (double) from vertical axis.')
+
+        expand.addParam('expand', params.BooleanParam,
+                        default=False,
+                        important=True)
+
+        expand.addParam('expandimage', params.FloatParam,
+                        default=0.0,
+                        important=True,
+                        condition='expand')
 
         form.addParam('multiscale', params.IntParam,
                       default=1,
                       label='Multiscale cross-correlation',
                       important=True,
                       help='Apply a multiscale approach with the given number '
-                           'of level.')
+                           'of level. (Default = 1 = no multiscale')
 
         form.addParam('cumulativereference', params.BooleanParam,
                       default=False,
                       label='Cumulative reference',
                       important=True,
-                      display=params.EnumParam.DISPLAY_HLIST,
                       help='If true, the processing is not done between '
                            'consecutive images but using central image as '
                            'reference to which is added the newly aligned '
@@ -146,14 +164,14 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       default=False,
                       label='Loop until stabilization',
                       important=True,
-                      display=params.EnumParam.DISPLAY_HLIST,
                       help='Refine alignment by doing the cross-correlation as'
                            ' many times as needed to stabilize.')
 
         form.addParam('computeAlignment', params.EnumParam,
                       choices=['Yes', 'No'],
                       default=1,
-                      label='Generate interpolated tilt-series', important=True,
+                      label='Generate interpolated tilt-series',
+                      important=True,
                       display=params.EnumParam.DISPLAY_HLIST,
                       help='Generate and save the interpolated tilt-series '
                            'applying the obtained transformation matrices.')
@@ -221,13 +239,13 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
             'tiltfile': os.path.join(tmpPrefix, '%s.rawtlt' % tsId),
             # 'integerTranslation': integerTranslation,
             'downsampling': self.downsampling.get(),
-            'rwidth': self.rwidth.get(),
-            'rheight': self.rheight.get(),
-            'bandpassmin': self.bandpassmin.get(),
-            'bandpassmax': self.bandpassmax.get(),
-            'bandpassdecrease': self.bandpassdecrease.get(),
+            # 'rwidth': self.rwidth.get(),
+            # 'rheight': self.rheight.get(),
+            # 'bandpassmin': self.bandpassmin.get(),
+            # 'bandpassmax': self.bandpassmax.get(),
+            # 'bandpassdecrease': self.bandpassdecrease.get(),
             'variancefilter': self.variancefilter.get(),
-            'expandimage': self.expandimage.get(),
+            # 'expandimage': self.expandimage.get(),
             'multiscale': self.multiscale.get(),
             # 'cumulativereference': cumulativereference,
             # 'loop': loop
@@ -252,30 +270,39 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         argsXcorr = "-loadangles %(tiltfile)s " \
                     "-xcorr " \
                     "downsampling %(downsampling)d " \
-                    "roi %(rwidth)d %(rheight)d " \
-                    "bandpassfilter %(bandpassmin)f %(bandpassmax)f %(bandpassdecrease)d " \
                     "variancefilter %(variancefilter)d " \
-                    "expandimage %(expandimage)f " \
                     "multiscale %(multiscale)d "
-                    # "-output %(output)s " \
-                    # "-RotationAngle %(RotationAngle)f " \
-                    # "-FilterSigma1 %(FilterSigma1)f " \
-                    # "-FilterSigma2 %(FilterSigma2)f " \
-                    # "-FilterRadius2 %(FilterRadius2)f"
+        # "roi %(rwidth)d %(rheight)d " \
+        # "bandpassfilter %(bandpassmin)f %(bandpassmax)f %(bandpassdecrease)d " \
+        # "expandimage %(expandimage)f " \
+        # "-output %(output)s " \
+        # "-RotationAngle %(RotationAngle)f " \
+        # "-FilterSigma1 %(FilterSigma1)f " \
+        # "-FilterSigma2 %(FilterSigma2)f " \
+        # "-FilterRadius2 %(FilterRadius2)f"
         if self.integerTranslation:
             argsXcorr += 'integertranslation '
         if self.cumulativereference:
             argsXcorr += 'cumulativereference '
         if self.loop:
             argsXcorr += 'loop '
+        if self.roi:
+            argsXcorr += 'roi %d %d ' % (self.rwidth.get(), self.rheight.get())
+        if self.bandpass:
+            argsXcorr += 'bandpassfilter %f %f %d ' % (self.bandpassmin.get(),
+                                                       self.bandpassmax.get(),
+                                                       self.bandpassdecrease.get())
+        if self.expand:
+            argsXcorr += 'expandimage %f ' % self.expandimage.get()
 
         # Add input as last arg
-        argsXcorr += "/home/acossa/ScipionUserData/projects/TestImodReconstructionWorkflow/%(input)s "
+        argsXcorr += "/home/acossa/ScipionUserData/projects/" \
+                     "TestImodReconstructionWorkflow/%(input)s "
         print(argsXcorr)
-        self.runJob('/home/acossa/ImageJ/jre/bin/java -Xmx28000m -cp /home/acossa/ImageJ/plugins/TomoJ_Applications-2.7-jar-with-dependencies.jar fr.curie.tomoj.TomoJ ', argsXcorr % paramsXcorr)
-
-
-
+        self.runJob(
+            '/home/acossa/ImageJ/jre/bin/java -Xmx28000m -cp /home/acossa/'
+            'ImageJ/plugins/TomoJ_Applications-2.7-jar-with-dependencies.jar '
+            'fr.curie.tomoj.TomoJ ', argsXcorr % paramsXcorr)
 
         # paramsXftoxg = {
         #     'input': os.path.join(extraPrefix, '%s.prexf' % tsId),
@@ -285,25 +312,28 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         #              "-goutput %(goutput)s"
         # self.runJob('xftoxg', argsXftoxg % paramsXftoxg)
 
-        """Generate output tilt series"""
-        outputSetOfTiltSeries = self.getOutputSetOfTiltSeries()
-        tsId = ts.getTsId()
-        alignmentMatrix = utils.formatTransformationMatrix(self._getExtraPath('%s/%s.prexg' % (tsId, tsId)))
-        newTs = tomoObj.TiltSeries(tsId=tsId)
-        newTs.copyInfo(ts)
-        outputSetOfTiltSeries.append(newTs)
-        for index, tiltImage in enumerate(ts):
-            newTi = tomoObj.TiltImage()
-            newTi.copyInfo(tiltImage, copyId=True)
-            newTi.setLocation(tiltImage.getLocation())
-            transform = data.Transform()
-            transform.setMatrix(alignmentMatrix[:, :, index])
-            newTi.setTransform(transform)
-            newTs.append(newTi)
-        newTs.write()
-        outputSetOfTiltSeries.update(newTs)
-        outputSetOfTiltSeries.write()
-        self._store()
+        # """Generate output tilt series"""
+        # outputSetOfTiltSeries = self.getOutputSetOfTiltSeries()
+        # tsId = ts.getTsId()
+        # ts.get
+        # # alignmentMatrix = utils.formatTransformationMatrix(self._getExtraPath('%s/%s_xcorr.txt' % (tsId, tsId)))
+        # # MANUAL .st FOR TEST TODO
+        # alignmentMatrix = utils.formatTransformationMatrix(self._getExtraPath('%s/%s.st_xcorr.txt' % (tsId, tsId)))
+        # newTs = tomoObj.TiltSeries(tsId=tsId)
+        # newTs.copyInfo(ts)
+        # outputSetOfTiltSeries.append(newTs)
+        # for index, tiltImage in enumerate(ts):
+        #     newTi = tomoObj.TiltImage()
+        #     newTi.copyInfo(tiltImage, copyId=True)
+        #     newTi.setLocation(tiltImage.getLocation())
+        #     transform = data.Transform()
+        #     transform.setMatrix(alignmentMatrix[:, :, index])
+        #     newTi.setTransform(transform)
+        #     newTs.append(newTi)
+        # newTs.write()
+        # outputSetOfTiltSeries.update(newTs)
+        # outputSetOfTiltSeries.write()
+        # self._store()
 
     def computeInterpolatedStackStep(self, tsObjId):
         outputInterpolatedSetOfTiltSeries = self.getOutputInterpolatedSetOfTiltSeries()
