@@ -28,10 +28,12 @@
 
 import os
 import numpy as np
-import imod.utils as utils
+# import imod.utils as utils
+import utils
 import pwem.objects as data
 import pyworkflow.protocol.params as params
 import pyworkflow.utils.path as path
+from pyworkflow.object import Set
 from pwem.protocols import EMProtocol
 import tomo.objects as tomoObj
 from tomo.protocols import ProtTomoBase
@@ -111,7 +113,7 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                           label='Min',
                           important=True,
                           condition='bandpass')
-        
+
         bandpass.addParam('bandpassmax', params.FloatParam,
                           label='Max',
                           important=True,
@@ -167,23 +169,32 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       help='Refine alignment by doing the cross-correlation as'
                            ' many times as needed to stabilize.')
 
-        form.addParam('computeAlignment', params.EnumParam,
-                      choices=['Yes', 'No'],
-                      default=1,
+        # form.addParam('computeAlignment', params.EnumParam,
+        #               choices=['Yes', 'No'],
+        #               default=1,
+        #               label='Generate interpolated tilt-series',
+        #               important=True,
+        #               display=params.EnumParam.DISPLAY_HLIST,
+        #               help='Generate and save the interpolated tilt-series '
+        #                    'applying the obtained transformation matrices.')
+        #
+        # group = form.addGroup('Interpolated tilt-series',
+        #                       condition='computeAlignment==0')
+        form.addParam('computeAlignment', params.BooleanParam,
+                      default=False,
                       label='Generate interpolated tilt-series',
                       important=True,
-                      display=params.EnumParam.DISPLAY_HLIST,
                       help='Generate and save the interpolated tilt-series '
                            'applying the obtained transformation matrices.')
 
-        group = form.addGroup('Interpolated tilt-series',
-                              condition='computeAlignment==0')
-
-        group.addParam('binning', params.FloatParam,
-                       default=1.0,
-                       label='Binning',
-                       help='Binning to be applied to the interpolated '
-                            'tilt-series. Must be a integer bigger than 1.')
+        # group = form.addGroup('Interpolated tilt-series',
+        #                       condition='computeAlignment')
+        #
+        # group.addParam('binning', params.FloatParam,
+        #                default=1.0,
+        #                label='Binning',
+        #                help='Binning to be applied to the interpolated '
+        #                     'tilt-series. Must be a integer bigger than 1.')
 
         # form.addParam('rotationAngle',
         #               params.FloatParam,
@@ -235,7 +246,7 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
 
         paramsXcorr = {
             'input': os.path.join(tmpPrefix, '%s.st' % tsId),
-            'output': os.path.join(extraPrefix, '%s.prexf' % tsId),
+            # 'output': os.path.join(extraPrefix, '%s.prexf' % tsId),
             'tiltfile': os.path.join(tmpPrefix, '%s.rawtlt' % tsId),
             # 'integerTranslation': integerTranslation,
             'downsampling': self.downsampling.get(),
@@ -277,9 +288,6 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         # "expandimage %(expandimage)f " \
         # "-output %(output)s " \
         # "-RotationAngle %(RotationAngle)f " \
-        # "-FilterSigma1 %(FilterSigma1)f " \
-        # "-FilterSigma2 %(FilterSigma2)f " \
-        # "-FilterRadius2 %(FilterRadius2)f"
         if self.integerTranslation:
             argsXcorr += 'integertranslation '
         if self.cumulativereference:
@@ -294,15 +302,20 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                                                        self.bandpassdecrease.get())
         if self.expand:
             argsXcorr += 'expandimage %f ' % self.expandimage.get()
+        if self.computeAlignment:
+            argsXcorr += '-savealignedimages '
 
         # Add input as last arg
         argsXcorr += "/home/acossa/ScipionUserData/projects/" \
                      "TestImodReconstructionWorkflow/%(input)s "
-        print(argsXcorr)
+        print(argsXcorr)  # DEBUG
         self.runJob(
             '/home/acossa/ImageJ/jre/bin/java -Xmx28000m -cp /home/acossa/'
             'ImageJ/plugins/TomoJ_Applications-2.7-jar-with-dependencies.jar '
             'fr.curie.tomoj.TomoJ ', argsXcorr % paramsXcorr)
+
+        """Debug code"""
+        path.moveTree(self._getTmpPath(), self._getExtraPath())
 
         # paramsXftoxg = {
         #     'input': os.path.join(extraPrefix, '%s.prexf' % tsId),
@@ -312,28 +325,26 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         #              "-goutput %(goutput)s"
         # self.runJob('xftoxg', argsXftoxg % paramsXftoxg)
 
-        # """Generate output tilt series"""
-        # outputSetOfTiltSeries = self.getOutputSetOfTiltSeries()
-        # tsId = ts.getTsId()
-        # ts.get
-        # # alignmentMatrix = utils.formatTransformationMatrix(self._getExtraPath('%s/%s_xcorr.txt' % (tsId, tsId)))
-        # # MANUAL .st FOR TEST TODO
-        # alignmentMatrix = utils.formatTransformationMatrix(self._getExtraPath('%s/%s.st_xcorr.txt' % (tsId, tsId)))
-        # newTs = tomoObj.TiltSeries(tsId=tsId)
-        # newTs.copyInfo(ts)
-        # outputSetOfTiltSeries.append(newTs)
-        # for index, tiltImage in enumerate(ts):
-        #     newTi = tomoObj.TiltImage()
-        #     newTi.copyInfo(tiltImage, copyId=True)
-        #     newTi.setLocation(tiltImage.getLocation())
-        #     transform = data.Transform()
-        #     transform.setMatrix(alignmentMatrix[:, :, index])
-        #     newTi.setTransform(transform)
-        #     newTs.append(newTi)
-        # newTs.write()
-        # outputSetOfTiltSeries.update(newTs)
-        # outputSetOfTiltSeries.write()
-        # self._store()
+        """Generate output tilt series"""
+        outputSetOfTiltSeries = self.getOutputSetOfTiltSeries()
+        tsId = ts.getTsId()
+        ts.get
+        alignmentMatrix = utils.formatTransformationMatrix(self._getExtraPath('%s/%s_xcorr.txt' % (tsId, tsId)))
+        newTs = tomoObj.TiltSeries(tsId=tsId)
+        newTs.copyInfo(ts)
+        outputSetOfTiltSeries.append(newTs)
+        for index, tiltImage in enumerate(ts):
+            newTi = tomoObj.TiltImage()
+            newTi.copyInfo(tiltImage, copyId=True)
+            newTi.setLocation(tiltImage.getLocation())
+            transform = data.Transform()
+            transform.setMatrix(alignmentMatrix[:, :, index])
+            newTi.setTransform(transform)
+            newTs.append(newTi)
+        newTs.write()
+        outputSetOfTiltSeries.update(newTs)
+        outputSetOfTiltSeries.write()
+        self._store()
 
     def computeInterpolatedStackStep(self, tsObjId):
         outputInterpolatedSetOfTiltSeries = self.getOutputInterpolatedSetOfTiltSeries()
@@ -379,10 +390,21 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
 
     # --------------------------- UTILS functions ----------------------------
     def getOutputSetOfTiltSeries(self):
-        if not hasattr(self, "outputSetOfTiltSeries"):
+        # if not hasattr(self, "outputSetOfTiltSeries"):
+        #     outputSetOfTiltSeries = self._createSetOfTiltSeries()
+        #     outputSetOfTiltSeries.copyInfo(self.inputSetOfTiltSeries.get())
+        #     outputSetOfTiltSeries.setDim(self.inputSetOfTiltSeries.get().getDim())
+        #     self._defineOutputs(outputSetOfTiltSeries=outputSetOfTiltSeries)
+        #     self._defineSourceRelation(self.inputSetOfTiltSeries, outputSetOfTiltSeries)
+        # return self.outputSetOfTiltSeries
+
+        if hasattr(self, "outputSetOfTiltSeries"):
+            self.outputSetOfTiltSeries.enableAppend()
+        else:
             outputSetOfTiltSeries = self._createSetOfTiltSeries()
             outputSetOfTiltSeries.copyInfo(self.inputSetOfTiltSeries.get())
             outputSetOfTiltSeries.setDim(self.inputSetOfTiltSeries.get().getDim())
+            outputSetOfTiltSeries.setStreamState(Set.STREAM_OPEN)
             self._defineOutputs(outputSetOfTiltSeries=outputSetOfTiltSeries)
             self._defineSourceRelation(self.inputSetOfTiltSeries, outputSetOfTiltSeries)
         return self.outputSetOfTiltSeries
@@ -421,11 +443,11 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         methods = []
         if not hasattr(self, 'outputInterpolatedSetOfTiltSeries'):
             methods.append("The transformation matrix has been calculated for %d "
-                           "Tilt-series using the IMOD procedure.\n"
+                           "Tilt-series using the TomoJ procedure.\n"
                            % (self.outputSetOfTiltSeries.getSize()))
         elif hasattr(self, 'outputInterpolatedSetOfTiltSeries'):
             methods.append("The transformation matrix has been calculated for %d "
-                           "Tilt-series using the IMOD procedure.\n"
+                           "Tilt-series using the TomoJ procedure.\n"
                            "Also, interpolation has been completed for %d Tilt-series.\n"
                            % (self.outputSetOfTiltSeries.getSize(),
                               self.outputInterpolatedSetOfTiltSeries.getSize()))
