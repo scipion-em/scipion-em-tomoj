@@ -169,17 +169,6 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       help='Refine alignment by doing the cross-correlation as'
                            ' many times as needed to stabilize.')
 
-        # form.addParam('computeAlignment', params.EnumParam,
-        #               choices=['Yes', 'No'],
-        #               default=1,
-        #               label='Generate interpolated tilt-series',
-        #               important=True,
-        #               display=params.EnumParam.DISPLAY_HLIST,
-        #               help='Generate and save the interpolated tilt-series '
-        #                    'applying the obtained transformation matrices.')
-        #
-        # group = form.addGroup('Interpolated tilt-series',
-        #                       condition='computeAlignment==0')
         form.addParam('computeAlignment', params.BooleanParam,
                       default=False,
                       label='Generate interpolated tilt-series',
@@ -187,21 +176,6 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       help='Generate and save the interpolated tilt-series '
                            'applying the obtained transformation matrices.')
 
-        # group = form.addGroup('Interpolated tilt-series',
-        #                       condition='computeAlignment')
-        #
-        # group.addParam('binning', params.FloatParam,
-        #                default=1.0,
-        #                label='Binning',
-        #                help='Binning to be applied to the interpolated '
-        #                     'tilt-series. Must be a integer bigger than 1.')
-
-        # form.addParam('rotationAngle',
-        #               params.FloatParam,
-        #               label='Tilt rotation angle (deg)',
-        #               default='0.0',
-        #               expertLevel=params.LEVEL_ADVANCED,
-        #               help="Angle from the vertical to the tilt axis in raw images.")
 
     # -------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
@@ -235,59 +209,21 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         extraPrefix = self._getExtraPath(tsId)
         tmpPrefix = self._getTmpPath(tsId)
 
-        # integerTranslation = ""
-        # if self.integerTranslation: integerTranslation = 'integertranslation'
-        #
-        # cumulativereference = ""
-        # if self.cumulativereference: cumulativereference = 'cumulativereference'
-        #
-        # loop = ""
-        # if self.loop.get() == True: loop = 'loop'
-
         paramsXcorr = {
             'input': os.path.join(tmpPrefix, '%s.st' % tsId),
             # 'output': os.path.join(extraPrefix, '%s.prexf' % tsId),
             'tiltfile': os.path.join(tmpPrefix, '%s.rawtlt' % tsId),
-            # 'integerTranslation': integerTranslation,
             'downsampling': self.downsampling.get(),
-            # 'rwidth': self.rwidth.get(),
-            # 'rheight': self.rheight.get(),
-            # 'bandpassmin': self.bandpassmin.get(),
-            # 'bandpassmax': self.bandpassmax.get(),
-            # 'bandpassdecrease': self.bandpassdecrease.get(),
             'variancefilter': self.variancefilter.get(),
-            # 'expandimage': self.expandimage.get(),
             'multiscale': self.multiscale.get(),
-            # 'cumulativereference': cumulativereference,
-            # 'loop': loop
-            # 'RotationAngle': self.rotationAngle.get(),
-            # 'FilterSigma1': 0.03,
-            # 'FilterSigma2': 0.05,
-            # 'FilterRadius2': 0.25
         }
-        # argsXcorr = "-loadangles %(tiltfile)s " \
-        #             "-xcorr " \
-        #             "%(integerTranslation)s " \
-        #             "downsampling %(downsampling)f " \
-        #             "roi %(rwidth)d %(rheight)d " \
-        #             "bandpassfilter %(bandpassmin)f %(bandpassmax)f %(bandpassdecrease)d" \
-        #             "variancefilter %(variancefilter)d " \
-        #             "expandimage %(expandimage)f " \
-        #             "multiscale %(multiscale)d " \
-        #             "%(cumulativereference)s " \
-        #             "%(loop)s " \
-        #             "/home/acossa/ScipionUserData/projects/TestImodReconstructionWorkflow/%(input)s "  # Input is the last argument
 
         argsXcorr = "-loadangles %(tiltfile)s " \
                     "-xcorr " \
                     "downsampling %(downsampling)d " \
                     "variancefilter %(variancefilter)d " \
                     "multiscale %(multiscale)d "
-        # "roi %(rwidth)d %(rheight)d " \
-        # "bandpassfilter %(bandpassmin)f %(bandpassmax)f %(bandpassdecrease)d " \
-        # "expandimage %(expandimage)f " \
-        # "-output %(output)s " \
-        # "-RotationAngle %(RotationAngle)f " \
+
         if self.integerTranslation:
             argsXcorr += 'integertranslation '
         if self.cumulativereference:
@@ -390,14 +326,6 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
 
     # --------------------------- UTILS functions ----------------------------
     def getOutputSetOfTiltSeries(self):
-        # if not hasattr(self, "outputSetOfTiltSeries"):
-        #     outputSetOfTiltSeries = self._createSetOfTiltSeries()
-        #     outputSetOfTiltSeries.copyInfo(self.inputSetOfTiltSeries.get())
-        #     outputSetOfTiltSeries.setDim(self.inputSetOfTiltSeries.get().getDim())
-        #     self._defineOutputs(outputSetOfTiltSeries=outputSetOfTiltSeries)
-        #     self._defineSourceRelation(self.inputSetOfTiltSeries, outputSetOfTiltSeries)
-        # return self.outputSetOfTiltSeries
-
         if hasattr(self, "outputSetOfTiltSeries"):
             self.outputSetOfTiltSeries.enableAppend()
         else:
