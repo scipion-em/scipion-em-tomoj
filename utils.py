@@ -27,7 +27,6 @@
 This module contains utils functions for TomoJ protocols
 """
 
-import csv
 import numpy as np
 
 
