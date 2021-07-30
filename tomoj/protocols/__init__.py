@@ -27,4 +27,4 @@
 # **************************************************************************
 
 from .protocol_xCorrPrealignment import ProtTomojXcorrPrealignment
-from .protocol_landmarksGeneration import ProtTomojLandmarksGeneration
+
