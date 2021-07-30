@@ -27,8 +27,6 @@
 # **************************************************************************
 
 import os
-import numpy as np
-# import imod.utils as utils
 import utils
 import pwem.objects as data
 import pyworkflow.protocol.params as params
@@ -37,6 +35,7 @@ from pyworkflow.object import Set
 from pwem.protocols import EMProtocol
 import tomo.objects as tomoObj
 from tomo.protocols import ProtTomoBase
+from tomoj import Plugin
 
 
 class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
@@ -176,14 +175,11 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       help='Generate and save the interpolated tilt-series '
                            'applying the obtained transformation matrices.')
 
-
     # -------------------------- INSERT steps functions ---------------------
     def _insertAllSteps(self):
         for ts in self.inputSetOfTiltSeries.get():
             self._insertFunctionStep('convertInputStep', ts.getObjId())
             self._insertFunctionStep('computeXcorrStep', ts.getObjId())
-            # if self.computeAlignment.get() == 0:
-            #     self._insertFunctionStep('computeInterpolatedStackStep', ts.getObjId())
 
     # --------------------------- STEPS functions ----------------------------
     def convertInputStep(self, tsObjId):
@@ -193,13 +189,15 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         tmpPrefix = self._getTmpPath(tsId)
         path.makePath(tmpPrefix)
         path.makePath(extraPrefix)
-        outputTsFileName = os.path.join(tmpPrefix, "%s.st" % tsId)
 
-        """Apply the transformation from the input tilt-series"""
+        """Apply the transformation form the input tilt-series"""
+        outputTsFileName = os.path.join(tmpPrefix,
+                                        ts.getFirstItem().parseFileName())
         ts.applyTransform(outputTsFileName)
 
         """Generate angle file"""
-        angleFilePath = os.path.join(tmpPrefix, "%s.rawtlt" % tsId)
+        angleFilePath = os.path.join(
+            tmpPrefix, ts.getFirstItem().parseFileName(extension=".tlt"))
         ts.generateTltFile(angleFilePath)
 
     def computeXcorrStep(self, tsObjId):
@@ -210,9 +208,12 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         tmpPrefix = self._getTmpPath(tsId)
 
         paramsXcorr = {
-            'input': os.path.join(tmpPrefix, '%s.st' % tsId),
+            # 'input': os.path.join(tmpPrefix, '%s.st' % tsId),
+            'input': os.path.join(tmpPrefix, ts.getFirstItem().parseFileName()),
             # 'output': os.path.join(extraPrefix, '%s.prexf' % tsId),
-            'tiltfile': os.path.join(tmpPrefix, '%s.rawtlt' % tsId),
+            # 'tiltfile': os.path.join(tmpPrefix, '%s.rawtlt' % tsId),
+            'tiltfile': os.path.join(
+                tmpPrefix, ts.getFirstItem().parseFileName(extension=".tlt")),
             'downsampling': self.downsampling.get(),
             'variancefilter': self.variancefilter.get(),
             'multiscale': self.multiscale.get(),
@@ -242,33 +243,24 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
             argsXcorr += '-savealignedimages '
 
         # Add input as last arg
-        argsXcorr += "/home/acossa/ScipionUserData/projects/" \
-                     "TestImodReconstructionWorkflow/%(input)s "
-        print(argsXcorr)  # DEBUG
-        self.runJob(
-            '/home/acossa/ImageJ/jre/bin/java -Xmx28000m -cp /home/acossa/'
-            'ImageJ/plugins/TomoJ_Applications-2.7-jar-with-dependencies.jar '
-            'fr.curie.tomoj.TomoJ ', argsXcorr % paramsXcorr)
+        argsXcorr += "%(input)s "
+
+        # Run TomoJ
+        Plugin.runTomoJ(self, argsXcorr % paramsXcorr)
 
         """Debug code"""
         path.moveTree(self._getTmpPath(), self._getExtraPath())
 
-        # paramsXftoxg = {
-        #     'input': os.path.join(extraPrefix, '%s.prexf' % tsId),
-        #     #'output': os.path.join(extraPrefix, '%s.prexg' % tsId),
-        # }
-        # argsXftoxg = "-input %(input)s " \
-        #              "-goutput %(goutput)s"
-        # self.runJob('xftoxg', argsXftoxg % paramsXftoxg)
-
         """Generate output tilt series"""
         outputSetOfTiltSeries = self.getOutputSetOfTiltSeries()
-        tsId = ts.getTsId()
-        ts.get
-        alignmentMatrix = utils.formatTransformationMatrix(self._getExtraPath('%s/%s_xcorr.txt' % (tsId, tsId)))
+
+        alignmentMatrix = utils.formatTransformationMatrix(
+            os.path.join(extraPrefix, ts.getFirstItem().parseFileName(
+                extension="_xcorr.txt")))
         newTs = tomoObj.TiltSeries(tsId=tsId)
         newTs.copyInfo(ts)
         outputSetOfTiltSeries.append(newTs)
+
         for index, tiltImage in enumerate(ts):
             newTi = tomoObj.TiltImage()
             newTi.copyInfo(tiltImage, copyId=True)
@@ -277,52 +269,13 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
             transform.setMatrix(alignmentMatrix[:, :, index])
             newTi.setTransform(transform)
             newTs.append(newTi)
-        newTs.write()
+
+        newTs.write(properties=False)
+
         outputSetOfTiltSeries.update(newTs)
         outputSetOfTiltSeries.write()
+
         self._store()
-
-    def computeInterpolatedStackStep(self, tsObjId):
-        outputInterpolatedSetOfTiltSeries = self.getOutputInterpolatedSetOfTiltSeries()
-        ts = self.inputSetOfTiltSeries.get()[tsObjId]
-
-        tsId = ts.getTsId()
-        newTs = tomoObj.TiltSeries(tsId=tsId)
-        newTs.copyInfo(ts)
-        outputInterpolatedSetOfTiltSeries.append(newTs)
-        extraPrefix = self._getExtraPath(tsId)
-        tmpPrefix = self._getTmpPath(tsId)
-
-        paramsAlignment = {
-            'input': os.path.join(tmpPrefix, '%s.st' % tsId),
-            'output': os.path.join(extraPrefix, '%s_preali.st' % tsId),
-            'xform': os.path.join(extraPrefix, "%s.prexg" % tsId),
-            'bin': int(self.binning.get()),
-            'imagebinned': 1.0
-        }
-        argsAlignment = "-input %(input)s " \
-                        "-output %(output)s " \
-                        "-xform %(xform)s " \
-                        "-bin %(bin)d " \
-                        "-imagebinned %(imagebinned)s"
-        self.runJob('newstack', argsAlignment % paramsAlignment)
-
-        for index, tiltImage in enumerate(ts):
-            newTi = tomoObj.TiltImage()
-            newTi.copyInfo(tiltImage, copyId=True)
-            newTi.setLocation(index + 1, (os.path.join(extraPrefix, '%s_preali.st' % tsId)))
-            if self.binning > 1:
-                newTi.setSamplingRate(tiltImage.getSamplingRate() * int(self.binning.get()))
-            newTs.append(newTi)
-        if self.binning > 1:
-            newTs.setSamplingRate(ts.getSamplingRate() * int(self.binning.get()))
-        newTs.write()
-        outputInterpolatedSetOfTiltSeries.update(newTs)  # update items and size info
-        outputInterpolatedSetOfTiltSeries.write()
-        self._store()
-
-        """Debug code"""
-        path.moveTree(self._getTmpPath(), self._getExtraPath())
 
     # --------------------------- UTILS functions ----------------------------
     def getOutputSetOfTiltSeries(self):
@@ -353,32 +306,32 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
     # --------------------------- INFO functions ----------------------------
     def _summary(self):
         summary = []
-        if not hasattr(self, 'outputInterpolatedSetOfTiltSeries'):
+        if not self.computeAlignment:
             summary.append("Input Tilt-Series: %d.\nTransformation matrices calculated: %d.\n"
                            % (self.inputSetOfTiltSeries.get().getSize(),
                               self.outputSetOfTiltSeries.getSize()))
-        elif hasattr(self, 'outputInterpolatedSetOfTiltSeries'):
+        elif self.computeAlignment:
             summary.append("Input Tilt-Series: %d.\nTransformation matrices calculated: %d.\n"
                            "Interpolated Tilt-Series: %d.\n"
                            % (self.outputSetOfTiltSeries.getSize(),
                               self.outputSetOfTiltSeries.getSize(),
-                              self.outputInterpolatedSetOfTiltSeries.getSize()))
+                              self.outputSetOfTiltSeries.getSize()))
         else:
             summary.append("Output classes not ready yet.")
         return summary
 
     def _methods(self):
         methods = []
-        if not hasattr(self, 'outputInterpolatedSetOfTiltSeries'):
+        if not self.computeAlignment:
             methods.append("The transformation matrix has been calculated for %d "
                            "Tilt-series using the TomoJ procedure.\n"
                            % (self.outputSetOfTiltSeries.getSize()))
-        elif hasattr(self, 'outputInterpolatedSetOfTiltSeries'):
+        elif self.computeAlignment:
             methods.append("The transformation matrix has been calculated for %d "
                            "Tilt-series using the TomoJ procedure.\n"
                            "Also, interpolation has been completed for %d Tilt-series.\n"
                            % (self.outputSetOfTiltSeries.getSize(),
-                              self.outputInterpolatedSetOfTiltSeries.getSize()))
+                              self.outputSetOfTiltSeries.getSize()))
         else:
             methods.append("Output classes not ready yet.")
         return methods
