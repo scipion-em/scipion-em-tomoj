@@ -72,16 +72,11 @@ class Plugin(pwem.Plugin):
         TOMOJ_INSTALLED = 'tomoj_%s_installed' % DEFAULT_VERSION
 
         # Download TomoJ .jar
-        # installationCmd = 'wget --continue --https-only ' \
-        #                   'https://sourceforge.net/projects/tomoj/files/' \
-        #                   'TomoJ_Applications-%s-jar-with-dependencies.jar && ' \
-        #                   % DEFAULT_VERSION
-        # Temporary solution to get TomoJ's latest version
-        installationCmd = 'wget --continue ' \
-                          'http://xfer.curie.fr/get/KaAoWTgodnt/' \
-                          'TomoJ_Applications-%s-jar-with-dependencies.jar && '\
+        installationCmd = 'wget --continue --https-only ' \
+                          'https://sourceforge.net/projects/tomoj/files/' \
+                          'TomoJ_Applications-%s-jar-with-dependencies.jar && ' \
                           % DEFAULT_VERSION
-
+    
         # Install dependencies
         # Fractional_Splines_Wavelets.jar
         installationCmd += 'wget --continue ' \
