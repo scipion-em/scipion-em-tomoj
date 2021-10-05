@@ -1,8 +1,10 @@
 # **************************************************************************
 # *
 # * Authors:     Federico P. de Isidro Gomez (fp.deisidro@cnb.csi.es) [1]
+# *              Antoine Cossa (antoine.cossa@universite-paris-saclay.fr) [2]
 # *
 # * [1] Centro Nacional de Biotecnologia, CSIC, Spain
+# * [2] Universite Paris-Saclay, Orsay, France
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -25,3 +27,4 @@
 # **************************************************************************
 
 from .protocol_xCorrPrealignment import ProtTomojXcorrPrealignment
+
