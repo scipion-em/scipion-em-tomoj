@@ -31,6 +31,7 @@ import utils
 import pwem.objects as data
 import pyworkflow.protocol.params as params
 import pyworkflow.utils.path as path
+from pyworkflow import BETA
 from pyworkflow.object import Set
 from pwem.protocols import EMProtocol
 import tomo.objects as tomoObj
@@ -46,6 +47,7 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
     """
 
     _label = 'xcorr prealignment'
+    _devStatus = BETA
 
     def __init__(self, **kwargs):
         EMProtocol.__init__(self, **kwargs)
@@ -60,7 +62,7 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       label='Input set of tilt-Series.')
 
         form.addParam('integerTranslation', params.BooleanParam,
-                      default=False,
+                      default=True,
                       label='Compute integer translation',
                       important=True,
                       help='Compute integer translation via cross correlation '
@@ -71,12 +73,14 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       label='Downsampling',
                       help='Reduce the size of images for computation. The '
                            'value (integer) corresponds to the factor of '
-                           'reduction, usually 2,4,8...')
+                           'reduction, usually 2,4,8...',
+                      expertLevel=params.LEVEL_ADVANCED)
 
         roi = form.addLine('ROI centered cross-correlation',
                            help='Take the central part of images of size Width'
                                 ' Height (integers) to compute cross-'
-                                'correlation.')
+                                'correlation.',
+                           expertLevel=params.LEVEL_ADVANCED)
 
         roi.addParam('roi', params.BooleanParam,
                      default=False,
@@ -102,7 +106,8 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                                      'radius of the band in pixels [minimum '
                                      'maximum]. The third value corresponds '
                                      '(double) to the sinusoidal decrease '
-                                     'radius (in pixels) to prevent artifacts.')
+                                     'radius (in pixels) to prevent artifacts.',
+                                expertLevel=params.LEVEL_ADVANCED)
 
         bandpass.addParam('bandpass', params.BooleanParam,
                           default=False,
@@ -128,13 +133,15 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       label='Variance filter radius',
                       important=True,
                       help='Apply a variance filter on images with the given '
-                           'radius (integer). It results in contours images.')
+                           'radius (integer). It results in contours images.',
+                      expertLevel=params.LEVEL_ADVANCED)
 
         expand = form.addLine('Expand images',
                               help='Expands the image to correct the '
                                    'stretching due to tilt. To do this '
                                    'correctly the tilt axis needs to be given '
-                                   'as angle (double) from vertical axis.')
+                                   'as angle (double) from vertical axis.',
+                              expertLevel=params.LEVEL_ADVANCED)
 
         expand.addParam('expand', params.BooleanParam,
                         default=False,
@@ -142,15 +149,17 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
 
         expand.addParam('expandimage', params.FloatParam,
                         default=0.0,
+                        label='Tilt-axis',
                         important=True,
                         condition='expand')
 
         form.addParam('multiscale', params.IntParam,
-                      default=1,
+                      default=2,
                       label='Multiscale cross-correlation',
                       important=True,
                       help='Apply a multiscale approach with the given number '
-                           'of level. (Default = 1 = no multiscale')
+                           'of level. (1 = no multiscale)',
+                      expertLevel=params.LEVEL_ADVANCED)
 
         form.addParam('cumulativereference', params.BooleanParam,
                       default=False,
@@ -159,10 +168,11 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
                       help='If true, the processing is not done between '
                            'consecutive images but using central image as '
                            'reference to which is added the newly aligned '
-                           'images.')
+                           'images.',
+                      expertLevel=params.LEVEL_ADVANCED)
 
         form.addParam('loop', params.BooleanParam,
-                      default=False,
+                      default=True,
                       label='Loop until stabilization',
                       important=True,
                       help='Refine alignment by doing the cross-correlation as'
@@ -180,6 +190,7 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         for ts in self.inputSetOfTiltSeries.get():
             self._insertFunctionStep('convertInputStep', ts.getObjId())
             self._insertFunctionStep('computeXcorrStep', ts.getObjId())
+        self._insertFunctionStep('closeOutputSetsStep')
 
     # --------------------------- STEPS functions ----------------------------
     def convertInputStep(self, tsObjId):
@@ -190,7 +201,7 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         path.makePath(tmpPrefix)
         path.makePath(extraPrefix)
 
-        """Apply the transformation form the input tilt-series"""
+        """Apply the transformation from the input tilt-series"""
         outputTsFileName = os.path.join(tmpPrefix,
                                         ts.getFirstItem().parseFileName())
         ts.applyTransform(outputTsFileName)
@@ -201,7 +212,7 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         ts.generateTltFile(angleFilePath)
 
     def computeXcorrStep(self, tsObjId):
-        """Compute transformation matrix for each tilt series"""
+        """Compute transformation matrix for each tilt-series"""
         ts = self.inputSetOfTiltSeries.get()[tsObjId]
         tsId = ts.getTsId()
         extraPrefix = self._getExtraPath(tsId)
@@ -249,11 +260,21 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
         Plugin.runTomoJ(self, argsXcorr % paramsXcorr)
 
         """Debug code"""
-        path.moveTree(self._getTmpPath(), self._getExtraPath())
+        # path.moveTree(self._getTmpPath(), self._getExtraPath())
+        """Move files to extra path"""
+        if self.computeAlignment:
+            path.moveFile(os.path.join(tmpPrefix, ts.getFirstItem().parseFileName(
+                              suffix="_ali", extension=".mrc")),
+                          os.path.join(extraPrefix, ts.getFirstItem().parseFileName(
+                              extension=".mrc")))
+
+        path.moveFile(os.path.join(tmpPrefix, ts.getFirstItem().parseFileName(
+                          extension="_xcorr.txt")),
+                      os.path.join(extraPrefix, ts.getFirstItem().parseFileName(
+                          extension="_xcorr.txt")))
 
         """Generate output tilt series"""
         outputSetOfTiltSeries = self.getOutputSetOfTiltSeries()
-
         alignmentMatrix = utils.formatTransformationMatrix(
             os.path.join(extraPrefix, ts.getFirstItem().parseFileName(
                 extension="_xcorr.txt")))
@@ -274,6 +295,11 @@ class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
 
         outputSetOfTiltSeries.update(newTs)
         outputSetOfTiltSeries.write()
+
+        self._store()
+
+    def closeOutputSetsStep(self):
+        self.getOutputSetOfTiltSeries().setStreamState(Set.STREAM_CLOSED)
 
         self._store()
 
