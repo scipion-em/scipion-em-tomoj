@@ -1,8 +1,10 @@
 # **************************************************************************
 # *
-# * Authors:     Federico P. de Isidro Gomez (fp.deisidro@cnb.csi.es) [1]
+# * Authors:     Antoine Cossa (antoine.cossa@universite-paris-saclay.fr) [1]
+#                Federico P. de Isidro Gomez (fp.deisidro@cnb.csi.es) [2]
 # *
-# * [1] Centro Nacional de Biotecnologia, CSIC, Spain
+# * [1] Universite Paris-Saclay, Orsay, France
+# * [2] Centro Nacional de Biotecnologia, CSIC, Spain
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -28,3 +30,11 @@
 # ----------------- Constants values --------------------------------------
 
 TOMOJ_HOME = 'TOMOJ_HOME'
+VERSION_2_7 = '2.7'
+DEFAULT_VERSION = VERSION_2_7
+IJ_VERSION = '153'
+
+VERSION_2_7 = '2.7'
+DEFAULT_VERSION = VERSION_2_7
+IJ_VERSION = '153'
+
