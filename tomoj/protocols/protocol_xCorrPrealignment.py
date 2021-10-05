@@ -42,8 +42,6 @@ from tomoj import Plugin
 class ProtTomojXcorrPrealignment(EMProtocol, ProtTomoBase):
     """
     Tilt-series' cross correlation alignment based on the TomoJ procedure.
-    More info:
-        http://u759.sfbiophys.org/software/update/20140207/Manual_TomoJ_2.24.pdf DEAD LINK
     """
 
     _label = 'xcorr prealignment'
